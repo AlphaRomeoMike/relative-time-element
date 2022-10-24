@@ -1,4 +1,4 @@
-const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
 const months = [
   'January',
   'February',
@@ -12,9 +12,73 @@ const months = [
   'October',
   'November',
   'December'
-]
+] as const
 
-export function strftime(time: Date, formatString: string): string {
+type Short<S extends string> = S extends `${infer h1}${infer h2}${infer h3}${string}` ? `${h1}${h2}${h3}` : never
+type Enumerate<N extends number, Acc extends number[] = []> = Acc['length'] extends N
+  ? Acc[number]
+  : Enumerate<N, [...Acc, Acc['length']]>
+type Range<F extends number, T extends number> = Exclude<Enumerate<T>, Enumerate<F>> | T
+type Pad<T extends string, P extends string> = T extends `${infer h1}${infer h2}${string}` ? `${h1}${h2}` : `${P}${T}`
+
+type Day = typeof weekdays[number]
+type Month = typeof months[number]
+
+type Token<Tok> = '%' extends Tok
+  ? '%'
+  : 'a' extends Tok
+  ? Short<Day>
+  : 'A' extends Tok
+  ? Day
+  : 'b' extends Tok
+  ? Short<Month>
+  : 'B' extends Tok
+  ? Month
+  : 'c' extends Tok
+  ? string
+  : 'd' extends Tok
+  ? Pad<`${Range<1, 31>}`, '0'>
+  : 'e' extends Tok
+  ? `${Range<1, 31>}`
+  : 'H' extends Tok
+  ? Pad<`${Range<1, 24>}`, '0'>
+  : 'I' extends Tok
+  ? Pad<`${Range<1, 12>}`, '0'>
+  : 'l' extends Tok
+  ? Pad<`${Range<1, 12>}`, ' '>
+  : 'm' extends Tok
+  ? Pad<`${Range<1, 12>}`, '0'>
+  : 'M' extends Tok
+  ? Pad<`${Range<0, 59>}`, '0'>
+  : 'p' extends Tok
+  ? 'am' | 'pm'
+  : 'P' extends Tok
+  ? 'AM' | 'PM'
+  : 'S' extends Tok
+  ? Pad<`${Range<0, 59>}`, '0'>
+  : 'w' extends Tok
+  ? `${Range<0, 6>}`
+  : 'y' extends Tok
+  ? Pad<`${Range<0, 99>}`, '0'>
+  : 'Y' extends Tok
+  ? `${Range<0, 9>}${Range<0, 9>}${Range<0, 9>}${Range<0, 9>}`
+  : 'Z' extends Tok
+  ? string
+  : 'z' extends Tok
+  ? `${'-' | '+'}${Range<0, 9>}${Range<0, 9>}${Range<0, 9>}${Range<0, 9>}`
+  : Tok extends string
+  ? `%${Tok}`
+  : never
+
+export type Strftime<Str> = Str extends `${infer Head}%${infer Tok}${infer Tail}`
+  ? `${Head}${Token<Tok>}${Strftime<Tail>}`
+  : Str extends `${infer Head}%${infer Tok}`
+  ? `${Head}${Token<Tok>}`
+  : Str extends string
+  ? Str
+  : never
+
+export function strftime<Str extends string>(time: Date, formatString: Str): Strftime<Str> {
   const day = time.getDay()
   const date = time.getDate()
   const month = time.getMonth()
@@ -22,7 +86,7 @@ export function strftime(time: Date, formatString: string): string {
   const hour = time.getHours()
   const minute = time.getMinutes()
   const second = time.getSeconds()
-  return formatString.replace(/%([%aAbBcdeHIlmMpPSwyYZz])/g, function (_arg) {
+  return formatString.replace(/%([%aAbBcdeHIlmMpPSwyYZz])/g, function (_arg: string) {
     let match
     const modifier = _arg[1]
     switch (modifier) {
@@ -88,5 +152,5 @@ export function strftime(time: Date, formatString: string): string {
         return match ? match[1] : ''
     }
     return ''
-  })
+  }) as unknown as Strftime<Str>
 }
